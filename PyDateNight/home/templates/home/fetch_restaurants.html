@@ -1,0 +1,7 @@
+{% extends 'base.html' %} {% block content %} {%if fetch_response == 'Success'%}
+<div class="alert alert-success" role="alert">
+  Successfully fetched restaurant data!
+</div>
+{% else %}
+<div class="alert alert-danger" role="alert">The fetch process errored!</div>
+{% endif %} {% endblock %}

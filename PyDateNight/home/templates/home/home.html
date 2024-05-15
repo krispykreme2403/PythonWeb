@@ -1,0 +1,14 @@
+{% extends 'base.html' %} {% block content %}
+<button
+  class="btn btn-primary text-center my-2"
+  type="button"
+  onclick="getLocation()"
+>
+  Get Location</button
+><br />
+
+<p id="user_latitude" class="text-center badge bg-success">test1</p>
+<p id="user_longitude" class="text-center badge bg-primary">test2</p>
+{% load static %}
+<script src="{% static '/js/geolocation.js' %}"></script>
+{% endblock %}

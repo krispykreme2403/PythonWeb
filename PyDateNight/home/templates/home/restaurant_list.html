@@ -1,0 +1,51 @@
+{% extends 'base.html' %} {% block content %} {% for business in businesses %}
+<div class="container card border-primary shadow mb-3">
+  <div class="row my-2">
+    <div class="col-lg-2">
+      {% if business.image_url %}
+      <img
+        src="{{business.image_url}}"
+        style="max-height: 100%"
+        class="card-img"
+        alt="{{business.name}}"
+      />
+      {% endif %}
+    </div>
+    <div class="col-lg-10">
+      <div class="row my-2">
+        <div class="col-lg-10">
+          <h4 class="card-title">
+            {{business.name}}<a href="{{business.url}}" target="_blank"
+              ><i
+                class="bi bi-arrow-up-right-square-fill text-primary mx-2"
+              ></i></a
+            ><a href="tel:{{business.phone}}"
+              ><i class="bi bi-telephone-outbound-fill text-primary mx-2"></i
+            ></a>
+          </h4>
+          <p>
+            {{business.location.display_address}} -
+            {{business.distance|stringformat:".2f"}} mi
+          </p>
+          {% if business.price %}
+          <span class="badge bg-success">{{business.price}}</span>
+          <span> | </span>
+          {% endif %} {% for category in business.categories.all %}
+          <span class="badge bg-primary">{{category.title}}</span>
+          {% endfor %} {% if business.is_closed %}
+          <span class="badge bg-danger">Permanently Closed</span>
+          {% endif %}
+        </div>
+        <div class="col-lg-2 card-title">
+          {% load static %}
+          <img
+            style="max-width: 100%"
+            src="{% static '/images/ratings/' %}{{business.rating_img_url}}"
+          />
+          <p>{{business.rating}} ({{business.review_count}} reviews)</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %} {% endblock %}
