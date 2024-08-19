@@ -9,23 +9,32 @@ class YelpController(object):
                 'Content-Type': 'application/json'}
 
     @classmethod
-    def connect_to_yelp(cls, location='Lone Tree, CO', categories='fancy dinner', limit=50):
+    def connect_to_yelp(cls, location='Englewood, CO', term='date night', categories='restaurants,All', limit=50):
         params = {'location': location,
+                  'term': term,
                   'categories': categories,
-                  'radius': 40000,
+                  'radius': 30000,
                   'limit': limit,
                   'offset': 0,
                   'price': '2,3,4'}
         session = Session()
-        request = Request(
-            'GET', cls._URL, headers=cls._HEADERS, params=params)
         response_query = Query()
-        while params['offset'] < response_query.total and params['offset'] < 900:
-            request = Request(
-                'GET', cls._URL, headers=cls._HEADERS, params=params)
-            response = session.send(request.prepare())
-            response_query.add_businesses(response.json())
-            params['offset'] += 50
+        while True:
+            response = session.request('GET', cls._URL, headers=cls._HEADERS, params=params)
+            if response.status_code == 200:
+                response_query.add_businesses(response.json())
+                params['offset'] += limit
+            elif response.status_code == 400:
+                response_description = response.json()['error']['description']
+                if response_description.startswith('Too many results requested, limit+offset'):
+                    params['offset'] = int(response_description[52:len(response_description) - 1]) - limit
+                    response = session.request('GET', cls._URL, headers=cls._HEADERS, params=params)
+                    response_query.add_businesses(response.json())
+                    break
+                else:
+                    return f'Error: {response.status_code} -> {response.json()['error']['description']}'
+            else:
+                return f'Error: {response.status_code} -> {response.json()['error']['description']}'
         return 'Success'
 
 
@@ -37,6 +46,7 @@ class Query(object):
 
     def add_businesses(self, response):
         M_TO_MILES = 0.000621371
+        self.total = response['total']
         for business in response['businesses']:
             Location.objects.update_or_create(display_address=' '.join(business['location']['display_address']),
                                               defaults={'address1': business['location']['address1'],
