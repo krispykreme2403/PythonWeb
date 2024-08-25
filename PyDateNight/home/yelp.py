@@ -7,35 +7,101 @@ class YelpController(object):
     _URL = 'https://api.yelp.com/v3/businesses/search'
     _HEADERS = {'Authorization': f'Bearer {_YELP_API_KEY}',
                 'Content-Type': 'application/json'}
+    _GRAPHQL_URL = 'https://api.yelp.com/v3/graphql'
+    _GRAPHQL_HEADERS = {'Authorization': f'Bearer {_YELP_API_KEY}',
+                        'Content-Type': 'application/graphql'}
 
     @classmethod
-    def connect_to_yelp(cls, location='Englewood, CO', term='date night', categories='restaurants,All', limit=50):
-        params = {'location': location,
-                  'term': term,
-                  'categories': categories,
-                  'radius': 30000,
-                  'limit': limit,
-                  'offset': 0,
-                  'price': '2,3,4'}
-        session = Session()
-        response_query = Query()
-        while True:
-            response = session.request('GET', cls._URL, headers=cls._HEADERS, params=params)
+    def connect_to_yelp(cls, location='Centennial, CO', term='date night', categories='restaurants,All', limit=50, offset=0):
+      '''
+      Connects to the Yelp API and retrieves businesses based on the search parameters
+      :param location: str
+      :param term: str
+      :param categories: str
+      :param limit: int
+      :param offset: int
+      :return: str
+
+      Towns to Search:
+      Denver, CO
+      Highlands Ranch, CO
+      Littleton, CO
+      Aurora, CO
+      Lakewood, CO
+      Lone Tree, CO
+      Parker, CO
+      Castle Rock, CO
+      Englewood, CO
+      Centennial, CO
+
+      Categories:
+      restaurants,All
+
+      Term:
+      date night
+
+      
+      '''
+
+
+
+
+      session = Session()
+      response_query = Query()
+      while True:
+            GRAPHQL_QUERY = f'''query MyQuery {{
+  search(
+    categories: "{categories}"
+    location: "{location}"
+    limit: {limit}
+    offset: {offset}
+    price: "2,3,4"
+    radius: 8000
+  ) {{
+    total
+    business {{
+      id
+      alias
+      coordinates {{
+        latitude
+        longitude
+      }}
+      name
+      is_closed
+      price
+      phone
+      photos
+      url
+      rating
+      location {{
+        address1
+        address3
+        address2
+        city
+        country
+        formatted_address
+        postal_code
+        state
+      }}
+      categories {{
+        alias
+        title
+      }}
+      distance
+      display_phone
+      review_count
+    }}
+  }}
+}}'''
+            response = session.request('POST', cls._GRAPHQL_URL, headers=cls._GRAPHQL_HEADERS, data=GRAPHQL_QUERY)
+            response_json = response.json()['data']['search']
             if response.status_code == 200:
-                response_query.add_businesses(response.json())
-                params['offset'] += limit
-            elif response.status_code == 400:
-                response_description = response.json()['error']['description']
-                if response_description.startswith('Too many results requested, limit+offset'):
-                    params['offset'] = int(response_description[52:len(response_description) - 1]) - limit
-                    response = session.request('GET', cls._URL, headers=cls._HEADERS, params=params)
-                    response_query.add_businesses(response.json())
-                    break
-                else:
-                    return f'Error: {response.status_code} -> {response.json()['error']['description']}'
+                if len(response_json['business']) == 0:
+                    return f'Success: Added/Updated {response_json["total"]} businesses'
+                response_query.add_businesses(response_json)
+                offset += limit
             else:
                 return f'Error: {response.status_code} -> {response.json()['error']['description']}'
-        return 'Success'
 
 
 class Query(object):
@@ -47,16 +113,16 @@ class Query(object):
     def add_businesses(self, response):
         M_TO_MILES = 0.000621371
         self.total = response['total']
-        for business in response['businesses']:
-            Location.objects.update_or_create(display_address=' '.join(business['location']['display_address']),
+        for business in response['business']:
+            Location.objects.update_or_create(display_address=business['location']['formatted_address'],
                                               defaults={'address1': business['location']['address1'],
                                                         'address2': business['location']['address2'],
                                                         'address3': business['location']['address3'],
                                                         'city': business['location']['city'],
-                                                        'zip_code': business['location']['zip_code'],
+                                                        'zip_code': business['location']['postal_code'],
                                                         'country': business['location']['country'],
                                                         'state': business['location']['state'],
-                                                        'display_address': ' '.join(business['location']['display_address'])})
+                                                        'display_address': business['location']['formatted_address']})
             for category in business['categories']:
                 Category.objects.update_or_create(alias=category['alias'],
                                                   title=category['title'],
@@ -71,7 +137,7 @@ class Query(object):
                                                                 defaults={'id': business['id'],
                                                                           'alias': business['alias'],
                                                                           'name': business['name'],
-                                                                          'image_url': business['image_url'],
+                                                                          'image_url': business['photos'][0],
                                                                           'is_closed': business['is_closed'],
                                                                           'url': business['url'],
                                                                           'review_count': business['review_count'],
@@ -81,7 +147,7 @@ class Query(object):
                                                                           'phone': business['phone'],
                                                                           'display_phone': business['display_phone'],
                                                                           'distance': business['distance'] * M_TO_MILES,
-                                                                          'location': Location.objects.get(display_address=' '.join(business['location']['display_address'])),
+                                                                          'location': Location.objects.get(display_address=business['location']['formatted_address']),
                                                                           'coordinates': Coordinates.objects.get(latitude=business['coordinates']['latitude'], longitude=business['coordinates']['longitude'])})
             business_result[0].categories.add(*[Category.objects.get(
                 alias=category['alias']) for category in business['categories']])

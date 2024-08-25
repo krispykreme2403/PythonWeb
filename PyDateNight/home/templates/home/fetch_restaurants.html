@@ -1,6 +1,6 @@
-{% extends 'base.html' %} {% block content %} {%if fetch_response == 'Success'%}
+{% extends 'base.html' %} {% block content %} {%if fetch_response|slice:":8" == 'Success:'%}
 <div class="alert alert-success" role="alert">
-  Successfully fetched restaurant data!
+  {{fetch_response}}
 </div>
 {% else %}
 <div class="alert alert-danger" role="alert">{{fetch_response}}</div>
