@@ -29,10 +29,13 @@ class RestaurantListView(LoginRequiredMixin, ListView):
         letter = self.request.GET.get('letter', None)
         # sort = self.request.Get.get('sort', None)
         print(letter)
-        if 'letter' != None:
+        if letter is not None:
             return Business.objects.filter(name__iregex=fr'^(?:the )?{letter}.+$').order_by('-rating', 'location__city')
 
 
-def fetch_restaurant_data(request):
+def fetch_restaurant_data(request, location=None):
     yelp = YelpController()
-    return render(request, 'fetch_restaurants.html', {'fetch_response': yelp.connect_to_yelp(), 'alphabet': ascii_uppercase})
+    if location:
+        return render(request, 'fetch_restaurants.html', {'fetch_response': yelp.connect_to_yelp(location=location), 'alphabet': ascii_uppercase})
+    else:
+        return render(request, 'fetch_restaurants.html', {'fetch_response': yelp.connect_to_yelp(), 'alphabet': ascii_uppercase})
