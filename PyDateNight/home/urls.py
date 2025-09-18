@@ -7,5 +7,7 @@ urlpatterns = [
     path('restaurant_list/', views.RestaurantListView.as_view(),
          name='restaurant_list'),
     path('fetch_restaurants/', views.fetch_restaurant_data,
-         name='fetch_restaurant_data')
+         name='fetch_restaurant_data'),
+    path('fetch_restaurants/<str:location>/', views.fetch_restaurant_data,
+         name='fetch_restaurant_data_with_location')
 ]

@@ -3,7 +3,7 @@ from home.models import Business, Category, Coordinates, Location
 
 
 class YelpController(object):
-    _YELP_API_KEY = '7GPm8UQYOVKm0pY31fRuZdKEbv-6lUUbN5inbMocknTUbzqJ3YsFO2_YiOB6QTHz7PV6QBWlSNMQKMdAyAI6pMQAszJQcMJVB381MTcSer_6O5ILZhpSVFzUe2XoY3Yx'
+    _YELP_API_KEY = 'ckUPeP6NnWsirNw46RbI6gaFGR24EXmSfRj0nLvC9ZGOJHcmdPmHh2pzerOXU-1HGIA7FkJsHucaFEeKsdyJXz7ilMehyDysLVeAz9rGJfEk5S0Npu_Ck8QQAIDLaHYx'
     _URL = 'https://api.yelp.com/v3/businesses/search'
     _HEADERS = {'Authorization': f'Bearer {_YELP_API_KEY}',
                 'Content-Type': 'application/json'}
@@ -12,7 +12,7 @@ class YelpController(object):
                         'Content-Type': 'application/graphql'}
 
     @classmethod
-    def connect_to_yelp(cls, location='Centennial, CO', term='date night', categories='restaurants,All', limit=50, offset=0):
+    def connect_to_yelp(cls, location='Denver, CO', term='date night', categories='restaurants,All', limit=50, offset=0):
       '''
       Connects to the Yelp API and retrieves businesses based on the search parameters
       :param location: str
@@ -48,7 +48,10 @@ class YelpController(object):
 
       session = Session()
       response_query = Query()
-      while True:
+      max_requests = 10  # Conservative limit to prevent QPS rate limiting - max 500 businesses (10 * 50 = 5,000 points per run)
+      requests_made = 0
+
+      while requests_made < max_requests:
             GRAPHQL_QUERY = f'''query MyQuery {{
   search(
     categories: "{categories}"
@@ -94,14 +97,42 @@ class YelpController(object):
   }}
 }}'''
             response = session.request('POST', cls._GRAPHQL_URL, headers=cls._GRAPHQL_HEADERS, data=GRAPHQL_QUERY)
-            response_json = response.json()['data']['search']
+            requests_made += 1
+
+            # Check if response is valid JSON first
+            try:
+                response_data = response.json()
+            except ValueError:
+                return f'Error: Invalid JSON response - {response.text[:200]}'
+
             if response.status_code == 200:
+                # Check if response has expected structure
+                if 'data' not in response_data or 'search' not in response_data['data']:
+                    return f'Error: Unexpected response structure - {response_data}'
+
+                response_json = response_data['data']['search']
+
+                # Check if we have businesses or reached the end
                 if len(response_json['business']) == 0:
-                    return f'Success: Added/Updated {response_json["total"]} businesses'
+                    return f'Success: Added/Updated {response_query.total} businesses'
+
                 response_query.add_businesses(response_json)
                 offset += limit
+
+                # If we've reached the total number of available businesses, stop
+                if offset >= response_json['total']:
+                    return f'Success: Added/Updated {response_query.total} businesses'
             else:
-                return f'Error: {response.status_code} -> {response.json()['error']['description']}'
+                # Handle error responses more safely
+                error_msg = 'Unknown error'
+                if 'error' in response_data:
+                    if isinstance(response_data['error'], dict) and 'description' in response_data['error']:
+                        error_msg = response_data['error']['description']
+                    else:
+                        error_msg = str(response_data['error'])
+                return f'Error: {response.status_code} -> {error_msg}'
+
+      return f'Success: Added/Updated {response_query.total} businesses (reached max requests limit)'
 
 
 class Query(object):
@@ -133,19 +164,27 @@ class Query(object):
                                                  longitude=business['coordinates']['longitude'],
                                                  defaults={'latitude': business['coordinates']['latitude'],
                                                            'longitude': business['coordinates']['longitude']})
+            # Handle photos safely - some businesses might not have photos
+            image_url = business['photos'][0] if business['photos'] and len(business['photos']) > 0 else ''
+
+            # Handle optional fields safely
+            price = business.get('price', '')
+            phone = business.get('phone', '')
+            display_phone = business.get('display_phone', '')
+
             business_result = Business.objects.update_or_create(id=business['id'],
                                                                 defaults={'id': business['id'],
                                                                           'alias': business['alias'],
                                                                           'name': business['name'],
-                                                                          'image_url': business['photos'][0],
+                                                                          'image_url': image_url,
                                                                           'is_closed': business['is_closed'],
                                                                           'url': business['url'],
                                                                           'review_count': business['review_count'],
                                                                           'rating': business['rating'],
                                                                           'rating_img_url': f"Review_Ribbon_small_16_{round(business['rating'] * 2) / 2}@2x.png",
-                                                                          'price': business['price'],
-                                                                          'phone': business['phone'],
-                                                                          'display_phone': business['display_phone'],
+                                                                          'price': price,
+                                                                          'phone': phone,
+                                                                          'display_phone': display_phone,
                                                                           'distance': business['distance'] * M_TO_MILES,
                                                                           'location': Location.objects.get(display_address=business['location']['formatted_address']),
                                                                           'coordinates': Coordinates.objects.get(latitude=business['coordinates']['latitude'], longitude=business['coordinates']['longitude'])})
