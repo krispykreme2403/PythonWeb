@@ -25,7 +25,15 @@ SECRET_KEY = 'django-insecure-v5&l$va9#46ehk2^$gs&)u44_^h9k%134)qu+szqz%)i7_h^25
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['20.168.121.122', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['20.168.121.122', 'localhost', '127.0.0.1', 'datenight.duckdns.org']
+
+# HTTPS Security Settings
+SECURE_SSL_REDIRECT = False  # Apache handles HTTP->HTTPS redirect
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 
 
 # Application definition
@@ -126,6 +134,10 @@ STATICFILES_DIRS = ('static',)
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Authentication settings
+LOGIN_REDIRECT_URL = '/restaurant_list/'
+LOGOUT_REDIRECT_URL = '/'
 
 
 if __name__ == '__main__':
