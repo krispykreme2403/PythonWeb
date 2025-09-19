@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12 mb-3">
+            <h2 class="text-center">Restaurant Map View</h2>
+            <p class="text-center">Click on a pin to see restaurant details. Your location will be shown with a blue marker.</p>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-12">
+            <div id="map" style="height: 70vh; width: 100%;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+
+<!-- Leaflet JavaScript -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+
+<script>
+    // Initialize the map
+    var map = L.map('map').setView([39.8283, -98.5795], 4); // Default to center of US
+
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Restaurant data from Django
+    var restaurants = [
+        {% for business in businesses %}
+        {% if business.coordinates %}
+        {
+            name: "{{ business.name|escapejs }}",
+            lat: {{ business.coordinates.latitude }},
+            lng: {{ business.coordinates.longitude }},
+            address: "{{ business.location.display_address|escapejs }}",
+            rating: {{ business.rating }},
+            price: "{{ business.price|default:''|escapejs }}",
+            url: "{{ business.url|escapejs }}",
+            phone: "{{ business.display_phone|escapejs }}",
+            distance: {{ business.distance }},
+            image_url: "{{ business.image_url|escapejs }}"
+        }{% if not forloop.last %},{% endif %}
+        {% endif %}
+        {% endfor %}
+    ];
+
+    // Add markers for each restaurant
+    var markers = [];
+    restaurants.forEach(function(restaurant) {
+        var marker = L.marker([restaurant.lat, restaurant.lng]).addTo(map);
+
+        // Create popup content
+        var popupContent = `
+            <div class="restaurant-popup" style="min-width: 250px;">
+                <h5>${restaurant.name}</h5>
+                ${restaurant.image_url ? `<img src="${restaurant.image_url}" style="width: 100%; max-height: 150px; object-fit: cover; margin-bottom: 10px;">` : ''}
+                <p><strong>Address:</strong> ${restaurant.address}</p>
+                <p><strong>Rating:</strong> ${restaurant.rating}/5</p>
+                ${restaurant.price ? `<p><strong>Price:</strong> ${restaurant.price}</p>` : ''}
+                <p><strong>Distance:</strong> ${restaurant.distance.toFixed(2)} mi</p>
+                <div class="mt-2">
+                    <a href="${restaurant.url}" target="_blank" class="btn btn-primary btn-sm">
+                        <i class="bi bi-arrow-up-right-square-fill"></i> View on Yelp
+                    </a>
+                    ${restaurant.phone ? `<a href="tel:${restaurant.phone}" class="btn btn-success btn-sm ms-1">
+                        <i class="bi bi-telephone-outbound-fill"></i> Call
+                    </a>` : ''}
+                </div>
+            </div>
+        `;
+
+        marker.bindPopup(popupContent);
+        markers.push(marker);
+    });
+
+    // User location marker
+    var userMarker = null;
+
+    // Function to get user's location
+    function getUserLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    var userLat = position.coords.latitude;
+                    var userLng = position.coords.longitude;
+
+                    // Create a custom icon for user location
+                    var userIcon = L.divIcon({
+                        className: 'user-location-marker',
+                        html: '<div style="background-color: #007bff; border: 3px solid white; border-radius: 50%; width: 20px; height: 20px; box-shadow: 0 0 10px rgba(0,123,255,0.5);"></div>',
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10]
+                    });
+
+                    // Add user location marker
+                    userMarker = L.marker([userLat, userLng], {icon: userIcon}).addTo(map);
+                    userMarker.bindPopup('<div class="text-center"><strong>Your Location</strong></div>');
+
+                    // Adjust map view to include user location and restaurants
+                    var allMarkers = [...markers];
+                    if (userMarker) {
+                        allMarkers.push(userMarker);
+                    }
+
+                    if (allMarkers.length > 0) {
+                        var group = new L.featureGroup(allMarkers);
+                        map.fitBounds(group.getBounds().pad(0.1));
+                    } else {
+                        // If no restaurants, center on user location
+                        map.setView([userLat, userLng], 13);
+                    }
+                },
+                function(error) {
+                    console.log('Error getting location:', error);
+                    // Fallback: just fit to restaurant markers if available
+                    if (markers.length > 0) {
+                        var group = new L.featureGroup(markers);
+                        map.fitBounds(group.getBounds().pad(0.1));
+                    }
+
+                    // Show error message to user
+                    var errorMsg = 'Unable to get your location. ';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMsg += 'Location access was denied. ';
+                            if (location.protocol === 'http:' && location.hostname !== 'localhost') {
+                                errorMsg += 'Try accessing the site via HTTPS for location access.';
+                            } else {
+                                errorMsg += 'Please check your browser settings and allow location access for this site.';
+                            }
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMsg += 'Location information is unavailable.';
+                            break;
+                        case error.TIMEOUT:
+                            errorMsg += 'Location request timed out.';
+                            break;
+                        default:
+                            errorMsg += 'An unknown error occurred.';
+                            break;
+                    }
+                    alert(errorMsg);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 300000 // 5 minutes
+                }
+            );
+        } else {
+            alert('Geolocation is not supported by this browser.');
+            // Fallback: fit to restaurant markers if available
+            if (markers.length > 0) {
+                var group = new L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+    }
+
+    // Request user location when page loads
+    getUserLocation();
+</script>
+
+{% endblock %}
