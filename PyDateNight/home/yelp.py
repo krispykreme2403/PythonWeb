@@ -1,9 +1,10 @@
 from requests import Request, Session
 from home.models import Business, Category, Coordinates, Location
+from django.conf import settings
 
 
 class YelpController(object):
-    _YELP_API_KEY = 'ckUPeP6NnWsirNw46RbI6gaFGR24EXmSfRj0nLvC9ZGOJHcmdPmHh2pzerOXU-1HGIA7FkJsHucaFEeKsdyJXz7ilMehyDysLVeAz9rGJfEk5S0Npu_Ck8QQAIDLaHYx'
+    _YELP_API_KEY = settings.YELP_API_KEY
     _URL = 'https://api.yelp.com/v3/businesses/search'
     _HEADERS = {'Authorization': f'Bearer {_YELP_API_KEY}',
                 'Content-Type': 'application/json'}

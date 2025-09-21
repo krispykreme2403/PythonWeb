@@ -8,8 +8,23 @@ from django.contrib.auth.views import LoginView
 from django.contrib.auth import login
 from django.contrib import messages
 from string import ascii_uppercase
+import re
 
 # Create your views here.
+
+def validate_letter_filter(letter):
+    """
+    Validate that the letter parameter is a single alphabetic character.
+    Returns the validated letter in uppercase, or None if invalid.
+    """
+    if not letter:
+        return None
+
+    # Only allow single alphabetic characters
+    if len(letter) == 1 and letter.isalpha():
+        return letter.upper()
+
+    return None
 
 
 class HomeView(TemplateView):
@@ -30,9 +45,13 @@ class RestaurantListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         qs = super(RestaurantListView, self).get_queryset()
         letter = self.request.GET.get('letter', None)
-        if letter is not None:
+        validated_letter = validate_letter_filter(letter)
+
+        if validated_letter:
+            # Use safe string formatting with validated input
+            # Django's iregex is safe when the pattern is controlled
             return Business.objects.filter(
-                name__iregex=fr'^(?:the )?{letter}.+$'
+                name__iregex=fr'^(?:the )?{re.escape(validated_letter)}.+$'
             ).order_by('-rating', 'location__city')
         return qs.order_by('-rating')
 
@@ -51,9 +70,13 @@ class RestaurantMapView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         qs = super(RestaurantMapView, self).get_queryset()
         letter = self.request.GET.get('letter', None)
-        if letter is not None:
+        validated_letter = validate_letter_filter(letter)
+
+        if validated_letter:
+            # Use safe string formatting with validated input
+            # Django's iregex is safe when the pattern is controlled
             return Business.objects.filter(
-                name__iregex=fr'^(?:the )?{letter}.+$'
+                name__iregex=fr'^(?:the )?{re.escape(validated_letter)}.+$'
             ).order_by('-rating', 'location__city')
         return qs.order_by('-rating')
 

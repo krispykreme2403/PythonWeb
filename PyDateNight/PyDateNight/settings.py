@@ -11,19 +11,24 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-v5&l$va9#46ehk2^$gs&)u44_^h9k%134)qu+szqz%)i7_h^25'
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key-change-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes', 'on')
 
 ALLOWED_HOSTS = ['20.168.121.122', 'localhost', '127.0.0.1', 'datenight.duckdns.org']
 
@@ -32,8 +37,20 @@ SECURE_SSL_REDIRECT = False  # Apache handles HTTP->HTTPS redirect
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Cookie Security Settings
 SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+
+# CSRF Security Settings
 CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_HTTPONLY = False  # Keep False to allow form submissions
+CSRF_COOKIE_SAMESITE = 'Lax'  # Balance security with compatibility
+CSRF_TRUSTED_ORIGINS = [
+    'https://datenight.duckdns.org',
+    'https://20.168.121.122',
+]
 
 
 # Application definition
@@ -138,6 +155,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Authentication settings
 LOGIN_REDIRECT_URL = '/restaurant_list/'
 LOGOUT_REDIRECT_URL = '/'
+
+# Yelp API Configuration
+YELP_API_KEY = os.getenv('YELP_API_KEY')
 
 
 if __name__ == '__main__':
